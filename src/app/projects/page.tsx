@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { BLOGS } from './data'  // ⚡ richtig importieren
+import { BLOGS } from './data'
 
 export default function Page() {
     return (
