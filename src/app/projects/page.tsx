@@ -2,6 +2,8 @@ import fs from "fs";
 import path from "path";
 import Link from "next/link";
 
+export const runtime = "edge";
+
 const projectsDir = path.join(process.cwd(), "content/projects");
 
 export default function Projects() {

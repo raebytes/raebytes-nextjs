@@ -5,6 +5,8 @@ import { serialize } from "next-mdx-remote/serialize";
 
 const projectsDir = path.join(process.cwd(), "content/projects");
 
+export const runtime = "edge";
+
 export async function generateStaticParams() {
     const files = fs.readdirSync(projectsDir).filter(f => f.endsWith(".mdx"));
     return files.map(f => ({ slug: f.replace(/\.mdx$/, "") }));
