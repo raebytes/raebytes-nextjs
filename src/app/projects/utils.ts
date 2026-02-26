@@ -1,83 +1,51 @@
 import fs from 'fs'
 import path from 'path'
+import matter from 'gray-matter'
 
-type Metadata = {
+export type Metadata = {
     title: string
     publishedAt: string
     summary: string
     image?: string
 }
 
-function parseFrontmatter(fileContent: string) {
-    let frontmatterRegex = /---\s*([\s\S]*?)\s*---/
-    let match = frontmatterRegex.exec(fileContent)
-    let frontMatterBlock = match![1]
-    let content = fileContent.replace(frontmatterRegex, '').trim()
-    let frontMatterLines = frontMatterBlock.trim().split('\n')
-    let metadata: Partial<Metadata> = {}
-
-    frontMatterLines.forEach((line) => {
-        let [key, ...valueArr] = line.split(': ')
-        let value = valueArr.join(': ').trim()
-        value = value.replace(/^['"](.*)['"]$/, '$1') // Remove quotes
-        metadata[key.trim() as keyof Metadata] = value
-    })
-
-    return { metadata: metadata as Metadata, content }
+export type BlogPost = {
+    slug: string
+    metadata: Metadata
+    content: string
 }
 
-// @ts-ignore
-function getMDXFiles(dir) {
-    return fs.readdirSync(dir).filter((file) => path.extname(file) === '.mdx')
-}
+const POSTS_PATH = path.join(process.cwd(), 'src', 'content', 'projects')
 
-// @ts-ignore
-function readMDXFile(filePath) {
-    let rawContent = fs.readFileSync(filePath, 'utf-8')
-    return parseFrontmatter(rawContent)
-}
+export function getBlogPosts(): BlogPost[] {
+    const files = fs.readdirSync(POSTS_PATH).filter((file) => file.endsWith('.mdx'))
 
-// @ts-ignore
-function getMDXData(dir) {
-    let mdxFiles = getMDXFiles(dir)
-    return mdxFiles.map((file) => {
-        let { metadata, content } = readMDXFile(path.join(dir, file))
-        let slug = path.basename(file, path.extname(file))
+    return files.map((file) => {
+        const filePath = path.join(POSTS_PATH, file)
+        const source = fs.readFileSync(filePath, 'utf-8')
+        const { data, content } = matter(source)
+        const slug = path.basename(file, '.mdx')
 
         return {
-            metadata,
             slug,
+            metadata: data as Metadata,
             content,
         }
     })
 }
 
-export function getBlogPosts() {
-    return getMDXData(path.join(process.cwd(), 'src', 'app', 'projects', 'pages'))
-}
-
 export function formatDate(date: string, includeRelative = false) {
     let currentDate = new Date()
-    if (!date.includes('T')) {
-        date = `${date}T00:00:00`
-    }
+    if (!date.includes('T')) date = `${date}T00:00:00`
     let targetDate = new Date(date)
 
     let yearsAgo = currentDate.getFullYear() - targetDate.getFullYear()
     let monthsAgo = currentDate.getMonth() - targetDate.getMonth()
     let daysAgo = currentDate.getDate() - targetDate.getDate()
 
-    let formattedDate = ''
-
-    if (yearsAgo > 0) {
-        formattedDate = `${yearsAgo}y ago`
-    } else if (monthsAgo > 0) {
-        formattedDate = `${monthsAgo}mo ago`
-    } else if (daysAgo > 0) {
-        formattedDate = `${daysAgo}d ago`
-    } else {
-        formattedDate = 'Today'
-    }
+    let formattedDate = yearsAgo > 0 ? `${yearsAgo}y ago` :
+        monthsAgo > 0 ? `${monthsAgo}mo ago` :
+            daysAgo > 0 ? `${daysAgo}d ago` : 'Today'
 
     let fullDate = targetDate.toLocaleString('en-us', {
         month: 'long',
@@ -85,9 +53,5 @@ export function formatDate(date: string, includeRelative = false) {
         year: 'numeric',
     })
 
-    if (!includeRelative) {
-        return fullDate
-    }
-
-    return `${fullDate} (${formattedDate})`
+    return includeRelative ? `${fullDate} (${formattedDate})` : fullDate
 }
