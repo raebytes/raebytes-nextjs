@@ -1,26 +1,88 @@
-import fs from "fs";
-import path from "path";
-import MDXWrapper from "@/components/MDXWrapper";
-import { serialize } from "next-mdx-remote/serialize";
+import { notFound } from 'next/navigation'
+import { CustomMDX } from "@/components/mdx";
+import { formatDate, getBlogPosts } from "@/app/projects/utils";
+import { baseUrl } from "@/app/sitemap";
+import { Metadata } from "next";
 
-const projectsDir = path.join(process.cwd(), "content/projects");
-
-export async function generateStaticParams() {
-    const files = fs.readdirSync(projectsDir).filter(f => f.endsWith(".mdx"));
-    return files.map(f => ({ slug: f.replace(/\.mdx$/, "") }));
+export type Props = {
+    params: { slug: string | Promise<string> } // ⚡ slug kann ein Promise sein
 }
 
-export default async function ProjectPage({ params: paramsPromise }: { params: Promise<{ slug: string }> }) {
-    const params = await paramsPromise;
+// SSG: Statische Pfade generieren
+export function generateStaticParams() {
+    const posts = getBlogPosts();
+    return posts.map(post => ({ slug: post.slug }));
+}
 
-    const filePath = path.join(projectsDir, `${params.slug}.mdx`);
+// Metadata für SEO / Open Graph
+export async function generateMetadata({ params }: Props): Promise<Metadata | undefined> {
+    const { slug } = await params; // ⚡ unbedingt await
 
-    if (!fs.existsSync(filePath)) {
-        return <p>Project not found</p>;
-    }
+    const post = getBlogPosts().find(p => p.slug === slug);
+    if (!post) return;
 
-    const source = fs.readFileSync(filePath, "utf-8");
-    const mdxSource = await serialize(source);
+    const { title, publishedAt, summary: description, image } = post.metadata;
+    const ogImage = image ? image : `${baseUrl}/og?title=${encodeURIComponent(title)}`;
 
-    return <MDXWrapper mdxSource={mdxSource} />;
+    return {
+        title,
+        description,
+        openGraph: {
+            title,
+            description,
+            type: 'article',
+            publishedTime: publishedAt,
+            url: `${baseUrl}/projects/${post.slug}`,
+            images: [{ url: ogImage }],
+        },
+        twitter: {
+            card: 'summary_large_image',
+            title,
+            description,
+            images: [ogImage],
+        },
+    };
+}
+
+// Page-Komponente
+export default async function Blog({ params }: Props) {
+    const { slug } = await params; // ⚡ unbedingt await
+    const posts = getBlogPosts();
+    const post = posts.find(p => p.slug === slug);
+
+    if (!post) notFound(); // 404 wenn Post nicht existiert
+
+    return (
+        <section>
+            {/* LD+JSON für SEO */}
+            <script
+                type="application/ld+json"
+                suppressHydrationWarning
+                dangerouslySetInnerHTML={{
+                    __html: JSON.stringify({
+                        "@context": "https://schema.org",
+                        "@type": "BlogPosting",
+                        headline: post.metadata.title,
+                        datePublished: post.metadata.publishedAt,
+                        dateModified: post.metadata.publishedAt,
+                        description: post.metadata.summary,
+                        image: post.metadata.image
+                            ? `${baseUrl}${post.metadata.image}`
+                            : `/og?title=${encodeURIComponent(post.metadata.title)}`,
+                        url: `${baseUrl}/projects/${post.slug}`,
+                        author: { "@type": "Person", name: "My Portfolio" },
+                    }),
+                }}
+            />
+            <h1 className="title font-semibold text-2xl tracking-tighter">{post.metadata.title}</h1>
+            <div className="flex justify-between items-center mt-2 mb-8 text-sm">
+                <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                    {formatDate(post.metadata.publishedAt)}
+                </p>
+            </div>
+            <article className="prose">
+                <CustomMDX source={post.content} />
+            </article>
+        </section>
+    );
 }
