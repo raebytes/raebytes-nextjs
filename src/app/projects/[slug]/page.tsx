@@ -1,34 +1,20 @@
 import { notFound } from 'next/navigation'
-import { CustomMDX} from "@/components/mdx";
+import { CustomMDX } from "@/components/mdx";
 import { formatDate, getBlogPosts } from "@/app/projects/utils";
-import { baseUrl} from "@/app/sitemap";
+import { baseUrl } from "@/app/sitemap";
 
 export async function generateStaticParams() {
-    let posts = getBlogPosts()
-
-    // @ts-ignore
-    return posts.map((post) => ({
-        slug: post.slug,
-    }))
+    const posts = getBlogPosts();
+    return posts.map(post => ({ slug: post.slug }));
 }
 
-// @ts-ignore
-export function generateMetadata({ params }) {
-    // @ts-ignore
-    let post = getBlogPosts().find((post) => post.slug === params.slug)
-    if (!post) {
-        return
-    }
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
+    const { slug } = await params;
+    const post = getBlogPosts().find(p => p.slug === slug);
+    if (!post) return;
 
-    let {
-        title,
-        publishedAt: publishedTime,
-        summary: description,
-        image,
-    } = post.metadata
-    let ogImage = image
-        ? image
-        : `${baseUrl}/og?title=${encodeURIComponent(title)}`
+    const { title, publishedAt: publishedTime, summary: description, image } = post.metadata;
+    const ogImage = image ? image : `${baseUrl}/og?title=${encodeURIComponent(title)}`;
 
     return {
         title,
@@ -39,11 +25,7 @@ export function generateMetadata({ params }) {
             type: 'article',
             publishedTime,
             url: `${baseUrl}/projects/${post.slug}`,
-            images: [
-                {
-                    url: ogImage,
-                },
-            ],
+            images: [{ url: ogImage }],
         },
         twitter: {
             card: 'summary_large_image',
@@ -51,17 +33,18 @@ export function generateMetadata({ params }) {
             description,
             images: [ogImage],
         },
-    }
+    };
 }
 
-// @ts-ignore
-export default function Blog({ params }) {
-    // @ts-ignore
-    let post = getBlogPosts().find((post) => post.slug === params.slug)
+// ✅ Default-Export Page Component
+interface PageProps {
+    params: { slug: string };
+}
 
-    if (!post) {
-        notFound()
-    }
+export default function Blog({ params }: PageProps) {
+    const post = getBlogPosts().find((post) => post.slug === params.slug);
+
+    if (!post) notFound();
 
     return (
         <section>
@@ -70,8 +53,8 @@ export default function Blog({ params }) {
                 suppressHydrationWarning
                 dangerouslySetInnerHTML={{
                     __html: JSON.stringify({
-                        '@context': 'https://schema.org',
-                        '@type': 'BlogPosting',
+                        "@context": "https://schema.org",
+                        "@type": "BlogPosting",
                         headline: post.metadata.title,
                         datePublished: post.metadata.publishedAt,
                         dateModified: post.metadata.publishedAt,
@@ -80,16 +63,11 @@ export default function Blog({ params }) {
                             ? `${baseUrl}${post.metadata.image}`
                             : `/og?title=${encodeURIComponent(post.metadata.title)}`,
                         url: `${baseUrl}/projects/${post.slug}`,
-                        author: {
-                            '@type': 'Person',
-                            name: 'My Portfolio',
-                        },
+                        author: { "@type": "Person", name: "My Portfolio" },
                     }),
                 }}
             />
-            <h1 className="title font-semibold text-2xl tracking-tighter">
-                {post.metadata.title}
-            </h1>
+            <h1 className="title font-semibold text-2xl tracking-tighter">{post.metadata.title}</h1>
             <div className="flex justify-between items-center mt-2 mb-8 text-sm">
                 <p className="text-sm text-neutral-600 dark:text-neutral-400">
                     {formatDate(post.metadata.publishedAt)}
@@ -99,5 +77,5 @@ export default function Blog({ params }) {
                 <CustomMDX source={post.content} />
             </article>
         </section>
-    )
+    );
 }
