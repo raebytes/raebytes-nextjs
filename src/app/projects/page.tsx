@@ -1,22 +1,15 @@
-import fs from "fs";
-import path from "path";
-import Link from "next/link";
+import { BlogPosts} from "@/components/posts";
 
-export const runtime = "edge";
+export const metadata = {
+    title: 'Blog',
+    description: 'Read my blog.',
+}
 
-const projectsDir = path.join(process.cwd(), "content/projects");
-
-export default function Projects() {
-    const files = fs.readdirSync(projectsDir).filter(f => f.endsWith(".mdx"));
-    const slugs = files.map(f => f.replace(/\.mdx$/, ""));
-
+export default function Page() {
     return (
-        <ul>
-            {slugs.map(slug => (
-                <li key={slug}>
-                    <Link href={`/projects/${slug}`}>{slug}</Link>
-                </li>
-            ))}
-        </ul>
-    );
+        <section>
+            <h1 className="font-semibold text-2xl mb-8 tracking-tighter">My Blog</h1>
+            <BlogPosts />
+        </section>
+    )
 }

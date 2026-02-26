@@ -1,28 +1,103 @@
-import fs from "fs";
-import path from "path";
-import MDXWrapper from "@/components/MDXWrapper";
-import { serialize } from "next-mdx-remote/serialize";
-
-const projectsDir = path.join(process.cwd(), "content/projects");
-
-export const runtime = "edge";
+import { notFound } from 'next/navigation'
+import { CustomMDX} from "@/components/mdx";
+import { formatDate, getBlogPosts } from "@/app/projects/utils";
+import { baseUrl} from "@/app/sitemap";
 
 export async function generateStaticParams() {
-    const files = fs.readdirSync(projectsDir).filter(f => f.endsWith(".mdx"));
-    return files.map(f => ({ slug: f.replace(/\.mdx$/, "") }));
+    let posts = getBlogPosts()
+
+    // @ts-ignore
+    return posts.map((post) => ({
+        slug: post.slug,
+    }))
 }
 
-export default async function ProjectPage({ params: paramsPromise }: { params: Promise<{ slug: string }> }) {
-    const params = await paramsPromise;
-
-    const filePath = path.join(projectsDir, `${params.slug}.mdx`);
-
-    if (!fs.existsSync(filePath)) {
-        return <p>Project not found</p>;
+// @ts-ignore
+export function generateMetadata({ params }) {
+    // @ts-ignore
+    let post = getBlogPosts().find((post) => post.slug === params.slug)
+    if (!post) {
+        return
     }
 
-    const source = fs.readFileSync(filePath, "utf-8");
-    const mdxSource = await serialize(source);
+    let {
+        title,
+        publishedAt: publishedTime,
+        summary: description,
+        image,
+    } = post.metadata
+    let ogImage = image
+        ? image
+        : `${baseUrl}/og?title=${encodeURIComponent(title)}`
 
-    return <MDXWrapper mdxSource={mdxSource} />;
+    return {
+        title,
+        description,
+        openGraph: {
+            title,
+            description,
+            type: 'article',
+            publishedTime,
+            url: `${baseUrl}/blog/${post.slug}`,
+            images: [
+                {
+                    url: ogImage,
+                },
+            ],
+        },
+        twitter: {
+            card: 'summary_large_image',
+            title,
+            description,
+            images: [ogImage],
+        },
+    }
+}
+
+// @ts-ignore
+export default function Blog({ params }) {
+    // @ts-ignore
+    let post = getBlogPosts().find((post) => post.slug === params.slug)
+
+    if (!post) {
+        notFound()
+    }
+
+    return (
+        <section>
+            <script
+                type="application/ld+json"
+                suppressHydrationWarning
+                dangerouslySetInnerHTML={{
+                    __html: JSON.stringify({
+                        '@context': 'https://schema.org',
+                        '@type': 'BlogPosting',
+                        headline: post.metadata.title,
+                        datePublished: post.metadata.publishedAt,
+                        dateModified: post.metadata.publishedAt,
+                        description: post.metadata.summary,
+                        image: post.metadata.image
+                            ? `${baseUrl}${post.metadata.image}`
+                            : `/og?title=${encodeURIComponent(post.metadata.title)}`,
+                        url: `${baseUrl}/blog/${post.slug}`,
+                        author: {
+                            '@type': 'Person',
+                            name: 'My Portfolio',
+                        },
+                    }),
+                }}
+            />
+            <h1 className="title font-semibold text-2xl tracking-tighter">
+                {post.metadata.title}
+            </h1>
+            <div className="flex justify-between items-center mt-2 mb-8 text-sm">
+                <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                    {formatDate(post.metadata.publishedAt)}
+                </p>
+            </div>
+            <article className="prose">
+                <CustomMDX source={post.content} />
+            </article>
+        </section>
+    )
 }
