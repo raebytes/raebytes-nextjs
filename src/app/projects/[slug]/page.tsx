@@ -2,18 +2,26 @@ import { notFound } from 'next/navigation'
 import { CustomMDX } from "@/components/mdx";
 import { formatDate, getBlogPosts } from "@/app/projects/utils";
 import { baseUrl } from "@/app/sitemap";
+import { Metadata } from "next";
 
-export async function generateStaticParams() {
+export type Props = {
+    params: { slug: string | Promise<string> } // ⚡ slug kann ein Promise sein
+}
+
+// SSG: Statische Pfade generieren
+export function generateStaticParams() {
     const posts = getBlogPosts();
     return posts.map(post => ({ slug: post.slug }));
 }
 
-export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
-    const { slug } = await params;
+// Metadata für SEO / Open Graph
+export async function generateMetadata({ params }: Props): Promise<Metadata | undefined> {
+    const { slug } = await params; // ⚡ unbedingt await
+
     const post = getBlogPosts().find(p => p.slug === slug);
     if (!post) return;
 
-    const { title, publishedAt: publishedTime, summary: description, image } = post.metadata;
+    const { title, publishedAt, summary: description, image } = post.metadata;
     const ogImage = image ? image : `${baseUrl}/og?title=${encodeURIComponent(title)}`;
 
     return {
@@ -23,7 +31,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
             title,
             description,
             type: 'article',
-            publishedTime,
+            publishedTime: publishedAt,
             url: `${baseUrl}/projects/${post.slug}`,
             images: [{ url: ogImage }],
         },
@@ -36,18 +44,17 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     };
 }
 
-// ✅ Default-Export Page Component
-interface PageProps {
-    params: { slug: string };
-}
+// Page-Komponente
+export default async function Blog({ params }: Props) {
+    const { slug } = await params; // ⚡ unbedingt await
+    const posts = getBlogPosts();
+    const post = posts.find(p => p.slug === slug);
 
-export default function Blog({ params }: PageProps) {
-    const post = getBlogPosts().find((post) => post.slug === params.slug);
-
-    if (!post) notFound();
+    if (!post) notFound(); // 404 wenn Post nicht existiert
 
     return (
         <section>
+            {/* LD+JSON für SEO */}
             <script
                 type="application/ld+json"
                 suppressHydrationWarning
